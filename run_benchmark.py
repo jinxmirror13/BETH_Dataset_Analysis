@@ -62,7 +62,7 @@ def test_sklearn(seed, args, train_dataset, test_dataset):
 
 
 ## VAE + DoSE(SVM)
-def train_vae(epoch, data_loader, model, prior, optimiser, device, iwae=1):
+def train_vae(epoch, data_loader, model, prior, optimiser, device):
     model.train()
     zs = []
     train_loss = 0
@@ -70,7 +70,7 @@ def train_vae(epoch, data_loader, model, prior, optimiser, device, iwae=1):
         x, y = x.to(device=device, non_blocking=True), y.to(device=device, non_blocking=True)
         observation, posterior, z = model(x)
         loss = -observation.log_prob(x) + kl_divergence(z, posterior, prior)
-        loss = -torch.logsumexp(-loss.view(loss.size(0) // iwae, -1), dim=1).mean() - log(iwae)
+        loss = -torch.logsumexp(-loss.view(loss.size(0), -1), dim=1).mean() - log(1)
         zs.append(z.detach())  # Store posterior samples
         train_loss += loss.item()
         
@@ -80,7 +80,7 @@ def train_vae(epoch, data_loader, model, prior, optimiser, device, iwae=1):
     return train_loss / len(data_loader), torch.cat(zs)
     
 
-def validate_vae(epoch, data_loader, model, prior, device, iwae=1):
+def validate_vae(epoch, data_loader, model, prior, device):
     model.eval()
     val_loss = 0
     with torch.no_grad():
@@ -88,7 +88,7 @@ def validate_vae(epoch, data_loader, model, prior, device, iwae=1):
             x, y = x.to(device=device, non_blocking=True), y.to(device=device, non_blocking=True)
             observation, posterior, z = model(x)
             loss = -observation.log_prob(x) + kl_divergence(z, posterior, prior)
-            val_loss += -torch.logsumexp(-loss.view(loss.size(0) // iwae, -1), dim=1).mean() - log(iwae)
+            val_loss += -torch.logsumexp(-loss.view(loss.size(0), -1), dim=1).mean() - log(1)
     return val_loss.item() / len(data_loader)
 
 def test_vae(seed, args, train_dataset, test_dataset):
@@ -174,7 +174,7 @@ def train(args):
         # Train model
         if use_vae:
             # Train generative model
-            train_loss, zs = train_vae(epoch, train_loader, model, prior, optimiser, args.device, args.iwae)
+            train_loss, zs = train_vae(epoch, train_loader, model, prior, optimiser, args.device)
         else:
             train_loss, model = train_sklearn(epoch, train_dataset, model)
         pbar.set_description(f"Epoch: {epoch} | Train Loss: {train_loss}")
@@ -182,7 +182,7 @@ def train(args):
 
         # Validate model
         if use_vae:
-            val_loss = validate_vae(epoch, val_loader, model, prior, args.device, args.iwae)
+            val_loss = validate_vae(epoch, val_loader, model, prior, args.device)
         else:
             val_loss = validate_sklearn(epoch, val_dataset, model)
         pbar.set_description(f"Epoch: {epoch} | Val Loss: {val_loss}")
