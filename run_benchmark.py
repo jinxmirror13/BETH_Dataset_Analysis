@@ -18,7 +18,7 @@ from benchmarks import WhitenedBenchmark
 from config import configure
 from dataset import BETHDataset, GaussianDataset, DATASETS
 from vae import VAE
-from dose import kl_divergence, get_summary_stats, DoSE_KDE, DoSE_SVM
+from dose import kl_divergence, get_summary_stats, DoSE_SVM
 from plotting import plot_data, plot_line
 
 # DEBUG timestamps
