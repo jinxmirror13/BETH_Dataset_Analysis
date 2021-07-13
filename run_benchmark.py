@@ -62,7 +62,7 @@ def test_sklearn(seed, args, train_dataset, test_dataset):
 
 
 ## VAE + DoSE(SVM)
-def train_vae(epoch, data_loader, model, prior, optimiser, device, iwae=1, path_derivative=False):
+def train_vae(epoch, data_loader, model, prior, optimiser, device, iwae=1):
     model.train()
     zs = []
     train_loss = 0
@@ -150,7 +150,7 @@ def train(args):
         use_vae = True
         input_shape = train_dataset.get_input_shape()
         model = VAE(input_shape=input_shape, latent_size=args.latent_size, hidden_size=args.hidden_size,
-                    observation=train_dataset.get_distribution(), path_derivative=args.path_derivative)
+                    observation=train_dataset.get_distribution())
         model.to(device=args.device)
         optimiser = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
         prior = MultivariateNormal(torch.zeros(args.latent_size, device=args.device), torch.eye(args.latent_size, device=args.device))
@@ -174,7 +174,7 @@ def train(args):
         # Train model
         if use_vae:
             # Train generative model
-            train_loss, zs = train_vae(epoch, train_loader, model, prior, optimiser, args.device, args.iwae, args.path_derivative)
+            train_loss, zs = train_vae(epoch, train_loader, model, prior, optimiser, args.device, args.iwae)
         else:
             train_loss, model = train_sklearn(epoch, train_dataset, model)
         pbar.set_description(f"Epoch: {epoch} | Train Loss: {train_loss}")
@@ -273,11 +273,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-

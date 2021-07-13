@@ -30,7 +30,6 @@ def configure():
     parser.add_argument('--iwae', type=int, default=1, metavar='I', help='Number of samples to use in importance-weighted ELBO (1 = ELBO)')
     parser.add_argument('--learning-rate', type=float, default=0.003, metavar='L', help='Learning rate')
     parser.add_argument('--weight-decay', type=float, default=0.1, metavar='W', help='Weight decay')
-    parser.add_argument('--path-derivative', action='store_true', help='Use path derivative estimator')
     args = parser.parse_args()
     use_cuda = torch.cuda.is_available() and not args.disable_cuda
     args.device = torch.device('cuda' if use_cuda else 'cpu')

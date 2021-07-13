@@ -89,10 +89,9 @@ class CategoricalDecoder(nn.Module):
 
 
 class VAE(nn.Module):
-    def __init__(self, input_shape, latent_size, hidden_size, observation, path_derivative=False):
+    def __init__(self, input_shape, latent_size, hidden_size, observation):
         super().__init__()
         self.input_shape, self.latent_size, self.observation = input_shape, latent_size, observation
-        self.path_derivative = path_derivative
         if len(input_shape) == 1:
             self.encoder = FCEncoder(input_shape[0], latent_size, hidden_size)
             self.decoder = FCDecoder(2 * input_shape[0] if observation == 'gaussian' else input_shape[0], latent_size, hidden_size)
@@ -105,8 +104,6 @@ class VAE(nn.Module):
 
     def encode(self, x):
         posterior_params = self.encoder(x)
-        if self.path_derivative:
-            posterior_params.detach_()  # Remove the high-variance score function term from the gradient estimate
         return Independent(Normal(posterior_params[:, :self.latent_size], posterior_params[:, self.latent_size:].exp()), 1)
 
     def decode(self, z):
