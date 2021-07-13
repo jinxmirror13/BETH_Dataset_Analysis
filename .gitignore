@@ -1,2 +1,6 @@
 .DS_Store
 data/*
+stats/*
+results/*
+__pycache__/*
+
