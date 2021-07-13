@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch.distributions import Categorical, ContinuousBernoulli, Distribution, Independent, Normal
+from torch.distributions import Categorical, Distribution, Independent, Normal
 from torch.nn import functional as F
 
 
@@ -37,34 +37,6 @@ class FCDecoder(nn.Module):
         return self.fc2(h1)
 
 
-class ConvEncoder(nn.Module):
-    def __init__(self, input_size, latent_size, hidden_size):
-        super().__init__()
-        self.conv1 = nn.Conv2d(input_size, hidden_size, 3, stride=2)  # TODO: Use pixel_unshuffle in next version of PyTorch?
-        self.conv2 = nn.Conv2d(hidden_size, 2 * hidden_size, 3, stride=2)
-        self.fc1 = nn.Linear(2 * hidden_size * 6 * 6, 2 * latent_size)
-
-    def forward(self, x):
-        h1 = F.relu(self.conv1(x))
-        h2 = F.relu(self.conv2(h1))
-        return self.fc1(h2.view(h2.size(0), -1))
-
-
-class ConvDecoder(nn.Module):
-    def __init__(self, output_size, latent_size, hidden_size):
-        super().__init__()
-        self.fc1 = nn.Linear(latent_size, 4 * hidden_size * 7 * 7)
-        self.conv1 = nn.Conv2d(4 * hidden_size, 4 * hidden_size, 3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_size, 4 * hidden_size, 3, padding=1)
-        self.conv3 = nn.Conv2d(hidden_size, output_size, 3, padding=1)
-
-    def forward(self, z):
-        h1 = F.relu(self.fc1(z))
-        h2 = F.pixel_shuffle(F.relu(self.conv1(h1.view(h1.size(0), -1, 7, 7))), 2)
-        h3 = F.pixel_shuffle(F.relu(self.conv2(h2)), 2)
-        return self.conv3(h3)
-
-
 class EmbeddingEncoder(nn.Module):
     def __init__(self, input_size, latent_size, hidden_size):
         super().__init__()
@@ -94,11 +66,8 @@ class VAE(nn.Module):
         self.input_shape, self.latent_size, self.observation = input_shape, latent_size, observation
         if len(input_shape) == 1:
             self.encoder = FCEncoder(input_shape[0], latent_size, hidden_size)
-            self.decoder = FCDecoder(2 * input_shape[0] if observation == 'gaussian' else input_shape[0], latent_size, hidden_size)
-        elif len(input_shape) == 3:
-            self.encoder = ConvEncoder(input_shape[0], latent_size, hidden_size)
-            self.decoder = ConvDecoder(2 * input_shape[0] if observation == 'gaussian' else input_shape[0], latent_size, hidden_size)
-        else:  # TODO: Distinguish data types properly
+            self.decoder = FCDecoder(2 * input_shape[0], latent_size, hidden_size)
+        else:
             self.encoder = EmbeddingEncoder(input_shape, latent_size, hidden_size)
             self.decoder = CategoricalDecoder(input_shape, latent_size, hidden_size)
 
@@ -110,8 +79,6 @@ class VAE(nn.Module):
         obs_params = self.decoder(z)
         if self.observation == 'gaussian':
             return Independent(Normal(obs_params[:, :self.input_shape[0]], obs_params[:, self.input_shape[0]:].exp()), len(self.input_shape))
-        elif self.observation == 'bernoulli':
-            return Independent(ContinuousBernoulli(logits=obs_params), len(self.input_shape))
         elif self.observation == 'categorical':
             return ProductOfCategoricals(logits=obs_params, num_classes=self.input_shape)
 
