@@ -3,11 +3,7 @@ import os
 import seaborn as sns
 from sklearn.decomposition import PCA
 
-
-# Initial parameters from:
-# https://scikit-learn.org/stable/auto_examples/miscellaneous/plot_anomaly_comparison.html#sphx-glr-auto-examples-miscellaneous-plot-anomaly-comparison-py
-
-BENCHMARK_LIST = ["rcov", "svm", "ifor", "vae"]
+BENCHMARK_LIST = ["rcov", "svm", "ifor", "dose"]
 
 ####################################################
 ## Custom Baseline Classes

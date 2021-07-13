@@ -71,7 +71,7 @@ def plot_data(dataset_list, label_list, base_dataset, prefix="dataset", suffix="
         raise Exception("Unequal length of lists passed") # Dumb check
 
     # Check if an sklearn model is in the list
-    SKLEARN_LIST = [b for b in BENCHMARK_LIST if b != "vae"]
+    SKLEARN_LIST = [b for b in BENCHMARK_LIST if b != "dose"]
     benchmark, benchmark_name, index = None, None, None
     if any(label in SKLEARN_LIST for label in label_list):
         index = [label in SKLEARN_LIST for label in label_list].index(True)

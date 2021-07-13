@@ -98,15 +98,6 @@ def test_vae(seed, args, train_dataset, test_dataset):
     train_summary_stats = torch.load(os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_train.pth"))
     val_summary_stats = torch.load(os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_val.pth"))
     test_summary_stats = torch.load(os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_test.pth"))
-    print(f"train shape: {train_summary_stats.shape}")
-    print(f"test shape: {test_summary_stats.shape}")
-
-    # # Construct and evaluate OoD models
-    # print("Run DoSE_KDE - ", datetime.now()) # DEBUG
-    # dose_kde = DoSE_KDE(train_summary_stats, val_summary_stats, 1)
-    # outlier_preds.append(dose_kde.detect_outliers(test_summary_stats))
-    # if args.vis:
-    #     plot_data([train_dataset, test_dataset, test_dataset.data[outlier_preds[-1]]], ["Train", "Test", "Outliers"], train_dataset, prefix=f"dose_kde_{args.dataset}_gaussian_{seed}_gaussian")
 
     print("Run DoSE_SVM - ", datetime.now()) # DEBUG
     dose_svm = DoSE_SVM(train_summary_stats)
@@ -125,6 +116,7 @@ def get_marginal_posterior(data_loader, model, device):
     mix = Categorical(torch.ones(means.size(0), device=device))
     comp = Independent(Normal(means, stddevs), 1)
     return MixtureSameFamily(mix, comp)
+
 
 ####################################################
 ## Script
@@ -145,8 +137,8 @@ def train(args):
     # Model
     ##########################
     model_name = args.benchmark
-    use_vae = True if model_name == "vae" else False
-    if model_name == "vae":
+    use_vae = True if model_name == "dose" else False
+    if model_name == "dose":
         use_vae = True
         input_shape = train_dataset.get_input_shape()
         model = VAE(input_shape=input_shape, latent_size=args.latent_size, hidden_size=args.hidden_size,
@@ -237,7 +229,7 @@ def test(args):
     else:
         raise Exception("Invalid dataset specified")
     
-    use_vae = True if args.benchmark == "vae" else False
+    use_vae = True if args.benchmark == "dose" else False
     outlier_preds = []
     for seed in tqdm.trange(1, 6):
         print(f"Run {args.dataset}_{args.benchmark}_{seed} at ", datetime.now()) # DEBUG
