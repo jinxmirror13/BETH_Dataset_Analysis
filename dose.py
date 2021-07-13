@@ -15,7 +15,6 @@ import tqdm
 from datetime import datetime # DEBUG
 
 
-# TODO: Rényi divergence?
 def kl_divergence(z, P, Q):
     return P.log_prob(z) - Q.log_prob(z)
 
@@ -52,4 +51,3 @@ class DoSE_SVM():
     def detect_outliers(self, test_summary_stats):
         # Evaluate DoSE one-class SVM on test dataset
         return self.clf.predict(self.pca.transform(test_summary_stats)) == -1
-

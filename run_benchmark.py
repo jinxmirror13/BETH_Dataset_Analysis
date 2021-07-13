@@ -1,9 +1,8 @@
-from math import log
-from matplotlib import pyplot as plt
-import numpy as np
 import os
 import pickle
-from pyro.distributions import Categorical, Independent, MixtureSameFamily, MultivariateNormal, Normal, constraints
+
+from matplotlib import pyplot as plt
+import numpy as np
 import seaborn as sns
 from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
@@ -11,6 +10,7 @@ from sklearn.linear_model import SGDOneClassSVM
 from sklearn.metrics import roc_auc_score
 import torch
 from torch import optim
+from torch.distributions import MultivariateNormal
 from torch.utils.data import DataLoader
 import tqdm
 
@@ -18,104 +18,12 @@ from benchmarks import WhitenedBenchmark
 from config import configure
 from dataset import BETHDataset, GaussianDataset, DATASETS
 from vae import VAE
-from dose import kl_divergence, get_summary_stats, DoSE_SVM
+from dose import get_summary_stats
 from plotting import plot_data, plot_line
+from training import get_marginal_posterior, test_sklearn, test_vae, train_sklearn, train_vae, validate_sklearn, validate_vae
 
 # DEBUG timestamps
 from datetime import datetime # DEBUG
-
-
-####################################################
-## Helper Functions
-####################################################
-
-## scikit-learn models
-def train_sklearn(epoch, dataset, model):
-    train_loss = 0
-    # fit the data and tag outliers
-    model.fit(dataset.data)
-    train_scores = model.decision_function(dataset.data) # positive distances for inlier, negative for outlier
-    train_loss = -1 * np.average(train_scores) # reverse signage
-    return train_loss, model
-
-
-def validate_sklearn(epoch, dataset, model):
-    # fit the data and tag outliers
-    val_scores = model.decision_function(dataset.data) # positive distances for inlier, negative for outlier
-    val_loss = -1 * np.average(val_scores) # reverse signage
-    return val_loss
-
-
-def test_sklearn(seed, args, train_dataset, test_dataset):
-    # Load the models (5 of each)
-    filename = os.path.join("results", f"{args.dataset}_{args.benchmark}_{seed}.pth")
-    model = pickle.load(open(filename, 'rb'))
-    # Run model on testing dataset
-    y_pred = model.predict(test_dataset.data)
-    if type(model) == IsolationForest or type(model) == SGDOneClassSVM:
-        y_pred = [0 if y == 1 else 1 for y in y_pred] # iForest sets 1 as inlier and -1 as outlier
-    else:
-        y_pred = [0 if y == -1 else y for y in y_pred]
-    outlier_preds = y_pred
-    # Compare labels/predictions to labels
-    return outlier_preds
-
-
-## VAE + DoSE(SVM)
-def train_vae(epoch, data_loader, model, prior, optimiser, device, iwae=1, path_derivative=False):
-    model.train()
-    zs = []
-    train_loss = 0
-    for i, (x, y) in enumerate(tqdm.tqdm(data_loader, leave=False)):
-        x, y = x.to(device=device, non_blocking=True), y.to(device=device, non_blocking=True)
-        observation, posterior, z = model(x)
-        loss = -observation.log_prob(x) + kl_divergence(z, posterior, prior)
-        loss = -torch.logsumexp(-loss.view(loss.size(0) // iwae, -1), dim=1).mean() - log(iwae)
-        zs.append(z.detach())  # Store posterior samples
-        train_loss += loss.item()
-        
-        optimiser.zero_grad(set_to_none=True)
-        loss.backward()
-        optimiser.step()
-    return train_loss / len(data_loader), torch.cat(zs)
-    
-
-def validate_vae(epoch, data_loader, model, prior, device, iwae=1):
-    model.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for i, (x, y) in enumerate(tqdm.tqdm(data_loader, leave=False)):
-            x, y = x.to(device=device, non_blocking=True), y.to(device=device, non_blocking=True)
-            observation, posterior, z = model(x)
-            loss = -observation.log_prob(x) + kl_divergence(z, posterior, prior)
-            val_loss += -torch.logsumexp(-loss.view(loss.size(0) // iwae, -1), dim=1).mean() - log(iwae)
-    return val_loss.item() / len(data_loader)
-
-def test_vae(seed, args, train_dataset, test_dataset):
-    # TODO: We actually want to load saved models and calculate summary statistics in this file
-    # Calculate result over ensemble of trained models
-    # Load dataset summary statistics
-    train_summary_stats = torch.load(os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_train.pth"))
-    val_summary_stats = torch.load(os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_val.pth"))
-    test_summary_stats = torch.load(os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_test.pth"))
-
-    print("Run DoSE_SVM - ", datetime.now()) # DEBUG
-    dose_svm = DoSE_SVM(train_summary_stats)
-    outlier_preds = dose_svm.detect_outliers(test_summary_stats)
-    return outlier_preds
-
-
-def get_marginal_posterior(data_loader, model, device):
-    model.eval()
-    posteriors = []
-    with torch.no_grad():
-        for i, (x, y) in enumerate(tqdm.tqdm(data_loader, leave=False)):
-            x, y = x.to(device=device, non_blocking=True), y.to(device=device, non_blocking=True)
-            posteriors.append(model.encode(x))
-    means, stddevs = torch.cat([p.mean for p in posteriors], dim=0), torch.cat([p.stddev for p in posteriors], dim=0)
-    mix = Categorical(torch.ones(means.size(0), device=device))
-    comp = Independent(Normal(means, stddevs), 1)
-    return MixtureSameFamily(mix, comp)
 
 
 ####################################################
@@ -128,11 +36,9 @@ def train(args):
     train_dataset, val_dataset, test_dataset = [DATASETS[args.dataset](split=split, subsample=args.subsample) for split in ["train", "val", "test"]]
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True)    
-    
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True)
     if args.vis and hasattr(train_dataset, "plot"):  # Plot the first two dimensions of each tensor dataset
         plot_data([train_dataset, val_dataset, test_dataset], ["train", "val", "test"], train_dataset, prefix=f"{args.dataset}_gaussian")
-
     ##########################
     # Model
     ##########################
@@ -142,7 +48,7 @@ def train(args):
         use_vae = True
         input_shape = train_dataset.get_input_shape()
         model = VAE(input_shape=input_shape, latent_size=args.latent_size, hidden_size=args.hidden_size,
-                    observation=train_dataset.get_distribution(), path_derivative=args.path_derivative)
+                    observation=train_dataset.get_distribution())
         model.to(device=args.device)
         optimiser = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
         prior = MultivariateNormal(torch.zeros(args.latent_size, device=args.device), torch.eye(args.latent_size, device=args.device))
@@ -166,7 +72,7 @@ def train(args):
         # Train model
         if use_vae:
             # Train generative model
-            train_loss, zs = train_vae(epoch, train_loader, model, prior, optimiser, args.device, args.iwae, args.path_derivative)
+            train_loss, zs = train_vae(epoch, train_loader, model, prior, optimiser, args.device)
         else:
             train_loss, model = train_sklearn(epoch, train_dataset, model)
         pbar.set_description(f"Epoch: {epoch} | Train Loss: {train_loss}")
@@ -174,7 +80,7 @@ def train(args):
 
         # Validate model
         if use_vae:
-            val_loss = validate_vae(epoch, val_loader, model, prior, args.device, args.iwae)
+            val_loss = validate_vae(epoch, val_loader, model, prior, args.device)
         else:
             val_loss = validate_sklearn(epoch, val_dataset, model)
         pbar.set_description(f"Epoch: {epoch} | Val Loss: {val_loss}")
@@ -216,7 +122,7 @@ def train(args):
         train_summary_stats = get_summary_stats(train_loader, model, marginal_posterior, 16, 4, args.seed, args.device)
         val_summary_stats = get_summary_stats(val_loader, model, marginal_posterior, 16, 4, args.seed, args.device)
         test_summary_stats = get_summary_stats(test_loader, model, marginal_posterior, 16, 4, args.seed, args.device)
-        # Save summary statistics TODO: Safer naming convention?
+        # Save summary statistics
         torch.save(train_summary_stats, os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_train.pth"))
         torch.save(val_summary_stats, os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_val.pth"))
         torch.save(test_summary_stats, os.path.join("stats", f"{args.dataset}_{args.benchmark}_{args.seed}_stats_test.pth"))
@@ -243,8 +149,6 @@ def test(args):
     print(f"Benchmark {args.benchmark} AUROC: {roc_auc_score(test_dataset.labels.numpy(), outlier_preds)}")
 
 
-
-
 def main():
     start = datetime.now() # DEBUG
     print("Start: ", start) # DEBUG
@@ -265,11 +169,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-

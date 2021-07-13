@@ -30,5 +30,3 @@ class WhitenedBenchmark():
 
     def predict(self, X):
         return self.clf.predict(self.pca.transform(X))
-
-
