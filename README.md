@@ -1,10 +1,17 @@
 # BETH Dataset Analysis
 
+
+
 This repository contains the corresponding code for "BETH Dataset: Real Cybersecurity Data for Anomaly Detection Research" by **Kate Highnam*** (@jinxmirror13), **Kai Arulkumaran*** (@kaixhin), **Zachary Hanif*** (@zhanif3), and **Nicholas R. Jennings**. This paper was published in the [ICML](https://icml.cc/) Workshop on [Uncertainty and Robustness in Deep Learning 2021](https://sites.google.com/view/udlworkshop2021/home).
 
 (* = equal contributions)
 
 For the dataset, [please download it from Kaggle](www.kaggle.com).
+
+
+**THIS CODE IS STILL BEING UPDATED**: This code is a slightly refactored version of what was used for the results in the paper for ease of use. 
+
+
 
 ## Organisation of the Repository
 
