@@ -28,7 +28,7 @@ class BETHDataset(TensorDataset):
             raise Exception("Error: Invalid 'split' given")
         self.name = split
         # Select columns and perform pre-processing
-        labels = pd.DataFrame(data[["sus"]])#, "evil"]]) # TODO do we need both labels?
+        labels = pd.DataFrame(data[["sus"]])
         data = pd.DataFrame(data[["processId", "parentProcessId", "userId", "mountNamespace", "eventId", "argsNum", "returnValue"]])
         data["processId"] = data["processId"].map(lambda x: 0 if x in [0, 1, 2] else 1)  # Map to OS/not OS
         data["parentProcessId"] = data["parentProcessId"].map(lambda x: 0 if x in [0, 1, 2] else 1)  # Map to OS/not OS
@@ -45,7 +45,7 @@ class BETHDataset(TensorDataset):
 
         super().__init__(self.data, self.labels)
 
-    def get_input_shape(self):  # TODO: Return actual shape
+    def get_input_shape(self):  # note that does not return actual shape, but is used to configure model for categorical data
         num_classes = self.data.max(dim=0)[0] + 1
         num_classes[4] = 1011  # Manually set eventId range as 0-1011 (1010 is max value)
         return num_classes
