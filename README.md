@@ -43,7 +43,7 @@ Stay at the highest level of the directory when running any of the following com
 ```
 python run_benchmark.py --train --benchmark vae
 
-# vae = VAE + DoSE-SVM
+# dose = VAE + DoSE-SVM
 # rcov = Robust Covariance
 # svm = One-Class SVM
 # ifor = Isolation Forest
