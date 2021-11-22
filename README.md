@@ -81,7 +81,7 @@ If you user our dataset or our code in your work, please cite us using:
 @article{highnam2021bethdata,
 	title={BETH Dataset: Real Cybersecurity Data for Anomaly Detection Research},
 	author={Highnam, Kate and Arulkumaran, Kai and Hanif, Zachary and Jennings, Nicholas R.},
-	booktitle={ICML Workshop on Uncertainty and Robustness in Deep Learning},
+	journal={ICML Workshop on Uncertainty and Robustness in Deep Learning},
 	year={2021}
 }
 ```
